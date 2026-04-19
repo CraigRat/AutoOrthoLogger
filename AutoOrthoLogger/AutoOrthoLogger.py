@@ -160,7 +160,7 @@ try:
                             lat, lon, alt = struct.unpack('<fff', data[9:21])
             except BlockingIOError: pass
 
-            stats = f"POS: {lat:.5f},{lon:.5f} | ALT: {alt:.1f}m | MEM: XP {xp_mb:.1f}MB, AO {ao_mb:.1f}MB, SYS {sys_p}%"
+            stats = f"POS: {lat:.5f},{lon:.5f} | ALT: {alt:.1f}m | MEM: XP {xp_mb:.1f}MB, AO {ao_mb:.1f}MB, SYS_U {sys_p}%, SYS_F {100.0-sys_p}%"
             write_log("HEARTBEAT", stats)
             last_heartbeat = now
 
