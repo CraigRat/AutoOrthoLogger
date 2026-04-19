@@ -30,15 +30,19 @@ class LogTailer:
         self.prefix = prefix
         self.handle = None
         self.last_inode = None
-        self._open_file()
+        self._open_file(seek_to_end=True) # Always seek to end on first run
 
-    def _open_file(self):
+    def _open_file(self, seek_to_end=False):
         if os.path.exists(self.path):
-            self.handle = open(self.path, "r", errors='ignore')
-            self.handle.seek(0, os.SEEK_END)
-            # Store the unique file ID (inode) to detect rotation
-            self.last_inode = os.stat(self.path).st_ino
-            return True
+            try:
+                self.handle = open(self.path, "r", errors='ignore')
+                if seek_to_end:
+                    self.handle.seek(0, os.SEEK_END)
+                # Store the unique file ID (inode)
+                self.last_inode = os.stat(self.path).st_ino
+                return True
+            except Exception as e:
+                write_log("SYSTEM", f"Error opening {self.prefix}: {e}")
         return False
 
     def check_rotation(self):
@@ -46,17 +50,19 @@ class LogTailer:
         if not os.path.exists(self.path):
             return
         
-        current_inode = os.stat(self.path).st_ino
-        if current_inode != self.last_inode:
-            write_log("SYSTEM", f"Detected log rotation for {self.prefix}. Re-opening...")
-            if self.handle:
-                self.handle.close()
-            self._open_file()
+        try:
+            current_inode = os.stat(self.path).st_ino
+            if current_inode != self.last_inode:
+                write_log("SYSTEM", f"Detected log rotation for {self.prefix}. Following new file.")
+                if self.handle:
+                    self.handle.close()
+                # When rotated, we want to read from the START of the new file
+                self._open_file(seek_to_end=False)
+        except Exception:
+            pass
 
     def read_lines(self):
         if self.handle:
-            return self.handle.readlines()
-        elif self._open_file(): # Try to recover if it was missing
             return self.handle.readlines()
         return []
 
@@ -71,7 +77,6 @@ def get_detailed_os():
                         os_info[k] = v
         details = (f"OS: {os_info.get('PRETTY_NAME', 'Linux')}\n"
                    f"Kernel: {platform.release()}\n"
-                   f"Architecture: {platform.machine()}\n"
                    f"Python: {sys.version.split()[0]}")
         return details
     except Exception as e: return f"OS Info Error: {e}"
@@ -115,7 +120,7 @@ def get_mem(target):
         except (psutil.NoSuchProcess, psutil.AccessDenied): continue
     return 0
 
-print(f"Logger initialized with Rotation Support. Type a note for markers.")
+print(f"Logger ready. Only capturing NEW log entries. Type a note for markers.")
 last_heartbeat = 0
 last_rotation_check = 0
 
